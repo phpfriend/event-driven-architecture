@@ -1,0 +1,25 @@
+{
+  "name": "shopflow",
+  "version": "1.0.0",
+  "description": "Event-driven order processing system — EDA demo with Node.js and AWS",
+  "private": true,
+  "scripts": {
+    "infra:up": "docker-compose up -d && node scripts/wait-for-localstack.js && node scripts/setup-local-aws.js",
+    "infra:down": "docker-compose down",
+    "infra:reset": "docker-compose down -v && docker-compose up -d && node scripts/wait-for-localstack.js && node scripts/setup-local-aws.js",
+    "infra:status": "docker-compose ps",
+    "dev:all": "concurrently --names \"ORDER,INVENTORY,PAYMENT,NOTIFY,AUDIT\" --prefix-colors \"cyan,green,yellow,magenta,blue\" \"cd services/order-service && npm run dev\" \"cd services/inventory-service && npm run dev\" \"cd services/payment-service && npm run dev\" \"cd services/notification-service && npm run dev\" \"cd services/audit-service && npm run dev\"",
+    "test:order": "node scripts/test-order.js",
+    "check:order": "node scripts/check-order.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/client-sns": "^3.600.0",
+    "@aws-sdk/client-sqs": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "dotenv": "^16.4.5"
+  }
+}

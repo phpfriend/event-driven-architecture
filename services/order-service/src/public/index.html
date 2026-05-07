@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ShopFlow — Event-Driven Store</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #22263a;
+    --border: #2e3350;
+    --accent: #6c63ff;
+    --accent2: #00d4aa;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --text: #e2e8f0;
+    --muted: #8892b0;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px; position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-size: 1.3rem; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+  .logo span { color: var(--accent2); }
+  .cart-btn {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 0.45rem 1rem; cursor: pointer; font-size: 0.95rem; font-weight: 600;
+    display: flex; align-items: center; gap: 0.4rem; transition: background 0.2s;
+  }
+  .cart-btn:hover { background: #5a52e0; }
+  .cart-count {
+    background: var(--accent2); color: #0f1117; border-radius: 50%;
+    width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 700;
+  }
+
+  /* ── Layout ── */
+  .layout { display: grid; grid-template-columns: 1fr 360px; gap: 1.5rem; padding: 1.5rem 2rem; max-width: 1300px; margin: 0 auto; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  /* ── Section heading ── */
+  .section-title { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .badge { background: var(--accent); color: #fff; border-radius: 20px; padding: 0.15rem 0.55rem; font-size: 0.72rem; font-weight: 700; }
+
+  /* ── Products ── */
+  .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+  .product-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; transition: border-color 0.2s;
+  }
+  .product-card:hover { border-color: var(--accent); }
+  .product-name { font-weight: 700; font-size: 1rem; }
+  .product-price { color: var(--accent2); font-size: 1.1rem; font-weight: 700; }
+  .product-stock { font-size: 0.8rem; color: var(--muted); }
+  .product-stock.low { color: var(--warn); }
+  .product-stock.out { color: var(--danger); }
+  .add-btn {
+    margin-top: auto; background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 0.5rem; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: background 0.2s;
+  }
+  .add-btn:hover:not(:disabled) { background: #5a52e0; }
+  .add-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+  .qty-ctrl { display: flex; align-items: center; gap: 0.5rem; margin-top: auto; }
+  .qty-ctrl button {
+    background: var(--border); color: var(--text); border: none; border-radius: 6px;
+    width: 30px; height: 30px; cursor: pointer; font-size: 1rem; font-weight: 700;
+  }
+  .qty-ctrl button:hover { background: var(--accent); }
+  .qty-ctrl span { min-width: 24px; text-align: center; font-weight: 700; }
+
+  /* ── Right panel ── */
+  .right-panel { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  /* ── Cart ── */
+  .cart-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+  .cart-items { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1rem; min-height: 48px; }
+  .cart-item { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+  .cart-item:last-child { border-bottom: none; }
+  .cart-empty { color: var(--muted); font-size: 0.9rem; text-align: center; padding: 0.5rem 0; }
+  .cart-total { display: flex; justify-content: space-between; font-weight: 700; border-top: 1px solid var(--border); padding-top: 0.75rem; }
+  .place-btn {
+    margin-top: 0.75rem; width: 100%; padding: 0.65rem; border: none; border-radius: 8px;
+    background: var(--accent2); color: #0f1117; font-weight: 700; font-size: 1rem; cursor: pointer; transition: background 0.2s;
+  }
+  .place-btn:hover:not(:disabled) { background: #00b896; }
+  .place-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+  /* ── Order tracker ── */
+  .tracker-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+  .tracker-empty { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 1rem 0; }
+  .order-id-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.75rem; word-break: break-all; }
+
+  /* Status steps */
+  .steps { display: flex; flex-direction: column; gap: 0; }
+  .step { display: flex; align-items: flex-start; gap: 0.75rem; position: relative; }
+  .step:not(:last-child)::after {
+    content: ''; position: absolute; left: 11px; top: 28px;
+    width: 2px; height: calc(100% + 4px); background: var(--border);
+  }
+  .step.done::after { background: var(--success); }
+  .step.active::after { background: var(--accent); }
+  .step-dot {
+    width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border);
+    background: var(--bg); flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; margin-top: 4px;
+  }
+  .step.done .step-dot { background: var(--success); border-color: var(--success); color: #fff; }
+  .step.active .step-dot { background: var(--accent); border-color: var(--accent); animation: pulse 1.2s infinite; }
+  .step.failed .step-dot { background: var(--danger); border-color: var(--danger); color: #fff; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(108,99,255,0.5)} 50%{box-shadow:0 0 0 6px rgba(108,99,255,0)} }
+  .step-info { padding-bottom: 1rem; }
+  .step-label { font-size: 0.9rem; font-weight: 600; }
+  .step-desc { font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem; }
+
+  /* ── Audit log ── */
+  .audit-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+  .audit-log { font-family: 'Courier New', monospace; font-size: 0.78rem; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.3rem; }
+  .audit-entry { display: flex; gap: 0.6rem; align-items: baseline; }
+  .audit-time { color: var(--muted); flex-shrink: 0; }
+  .audit-type { font-weight: 700; }
+  .audit-type.order { color: var(--accent); }
+  .audit-type.inventory { color: var(--accent2); }
+  .audit-type.payment { color: var(--warn); }
+  .audit-empty { color: var(--muted); font-size: 0.85rem; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.85rem 1.25rem; font-size: 0.9rem; max-width: 320px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4); transform: translateY(80px); opacity: 0;
+    transition: all 0.3s ease; pointer-events: none;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--success); }
+  .toast.error { border-color: var(--danger); }
+  .toast.warn { border-color: var(--warn); }
+
+  /* ── Loading ── */
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-row { display: flex; justify-content: center; padding: 2rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Shop<span>Flow</span></div>
+  <button class="cart-btn" onclick="scrollToCart()">
+    🛒 Cart <span class="cart-count" id="cartCount">0</span>
+  </button>
+</header>
+
+<div class="layout">
+  <!-- LEFT: Products + past orders -->
+  <div>
+    <div class="section-title">Products <span class="badge" id="productBadge">...</span></div>
+    <div class="products-grid" id="productsGrid">
+      <div class="loading-row"><div class="spinner"></div></div>
+    </div>
+
+    <div style="margin-top:2rem;">
+      <div class="section-title">Recent Orders</div>
+      <div id="recentOrders" style="font-size:0.85rem;color:var(--muted);">No orders yet.</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Cart + Tracker + Audit -->
+  <div class="right-panel" id="rightPanel">
+
+    <div class="cart-panel" id="cartSection">
+      <div class="section-title">Your Cart</div>
+      <div class="cart-items" id="cartItems">
+        <div class="cart-empty">Cart is empty</div>
+      </div>
+      <div class="cart-total">
+        <span>Total</span>
+        <span id="cartTotal">$0.00</span>
+      </div>
+      <button class="place-btn" id="placeBtn" onclick="placeOrder()" disabled>Place Order</button>
+    </div>
+
+    <div class="tracker-panel" id="trackerSection">
+      <div class="section-title">Order Tracker</div>
+      <div id="trackerContent">
+        <div class="tracker-empty">Place an order to see live status updates.</div>
+      </div>
+    </div>
+
+    <div class="audit-panel">
+      <div class="section-title">Live Audit Log <span id="auditBadge" class="badge" style="display:none"></span></div>
+      <div class="audit-log" id="auditLog">
+        <div class="audit-empty">Events will appear here as they flow through the system.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const cart = {};        // productId → { product, qty }
+let products = [];
+let activeStream = null;
+let recentOrders = [];
+
+// ── Bootstrap ──────────────────────────────────────────────────────────────
+async function loadProducts() {
+  try {
+    const res = await fetch('/products');
+    products = await res.json();
+    renderProducts();
+    document.getElementById('productBadge').textContent = products.length;
+  } catch (e) {
+    document.getElementById('productsGrid').innerHTML = '<p style="color:var(--danger)">Failed to load products. Is the server running?</p>';
+  }
+}
+
+// ── Product rendering ──────────────────────────────────────────────────────
+function renderProducts() {
+  const grid = document.getElementById('productsGrid');
+  if (!products.length) { grid.innerHTML = '<p style="color:var(--muted)">No products found.</p>'; return; }
+
+  grid.innerHTML = products.map(p => {
+    const inCart = cart[p.productId]?.qty || 0;
+    const stockClass = p.stock === 0 ? 'out' : p.stock < 5 ? 'low' : '';
+    const stockLabel = p.stock === 0 ? 'Out of stock' : `${p.stock} in stock${p.stock < 5 ? ' — low!' : ''}`;
+
+    return `
+    <div class="product-card" id="pc-${p.productId}">
+      <div class="product-name">${escHtml(p.productName || p.name || p.productId)}</div>
+      <div class="product-price">$${Number(p.price).toFixed(2)}</div>
+      <div class="product-stock ${stockClass}">${stockLabel}</div>
+      ${p.stock === 0
+        ? `<button class="add-btn" disabled>Out of stock</button>`
+        : inCart === 0
+          ? `<button class="add-btn" onclick="addToCart('${p.productId}')">Add to cart</button>`
+          : `<div class="qty-ctrl">
+               <button onclick="changeQty('${p.productId}',-1)">−</button>
+               <span>${inCart}</span>
+               <button onclick="changeQty('${p.productId}',1)" ${inCart >= p.stock ? 'disabled' : ''}>+</button>
+             </div>`
+      }
+    </div>`;
+  }).join('');
+}
+
+// ── Cart logic ─────────────────────────────────────────────────────────────
+function addToCart(productId) {
+  const p = products.find(x => x.productId === productId);
+  if (!p || p.stock === 0) return;
+  if (!cart[productId]) cart[productId] = { product: p, qty: 0 };
+  cart[productId].qty++;
+  renderProducts();
+  renderCart();
+}
+
+function changeQty(productId, delta) {
+  if (!cart[productId]) return;
+  cart[productId].qty += delta;
+  if (cart[productId].qty <= 0) delete cart[productId];
+  renderProducts();
+  renderCart();
+}
+
+function renderCart() {
+  const items = Object.values(cart);
+  const count = items.reduce((s, i) => s + i.qty, 0);
+  const total = items.reduce((s, i) => s + i.qty * i.product.price, 0);
+
+  document.getElementById('cartCount').textContent = count;
+  document.getElementById('cartTotal').textContent = `$${total.toFixed(2)}`;
+  document.getElementById('placeBtn').disabled = count === 0;
+
+  const el = document.getElementById('cartItems');
+  if (!items.length) { el.innerHTML = '<div class="cart-empty">Cart is empty</div>'; return; }
+
+  el.innerHTML = items.map(({ product: p, qty }) => `
+    <div class="cart-item">
+      <span>${escHtml(p.productName || p.name || p.productId)} ×${qty}</span>
+      <span>$${(qty * p.price).toFixed(2)}</span>
+    </div>`).join('');
+}
+
+// ── Place order ────────────────────────────────────────────────────────────
+async function placeOrder() {
+  const items = Object.values(cart);
+  if (!items.length) return;
+
+  document.getElementById('placeBtn').disabled = true;
+  document.getElementById('placeBtn').textContent = 'Placing…';
+
+  const body = {
+    customerId: 'CUST-UI-001',
+    items: items.map(({ product: p, qty }) => ({ productId: p.productId, quantity: qty })),
+  };
+
+  try {
+    const res = await fetch('/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || 'Order failed');
+
+    showToast(`Order placed! ID: ${data.orderId}`, 'success');
+
+    // Clear cart
+    Object.keys(cart).forEach(k => delete cart[k]);
+    renderProducts();
+    renderCart();
+
+    // Track this order
+    addRecentOrder(data.orderId, 'PENDING');
+    startTracking(data.orderId);
+
+  } catch (e) {
+    showToast(e.message, 'error');
+    document.getElementById('placeBtn').disabled = false;
+  }
+  document.getElementById('placeBtn').textContent = 'Place Order';
+}
+
+// ── SSE Tracker ────────────────────────────────────────────────────────────
+const STATUS_STEPS = [
+  { key: 'PENDING',              label: 'Order Placed',         desc: 'Saved to DynamoDB, event published to SNS' },
+  { key: 'INVENTORY_RESERVED',   label: 'Inventory Reserved',   desc: 'Stock decremented atomically in DynamoDB' },
+  { key: 'PAYMENT_PROCESSED',    label: 'Payment Processed',    desc: 'Charge approved, transaction ID assigned' },
+  { key: 'COMPLETED',            label: 'Completed',            desc: 'Confirmation sent, order fulfilled' },
+];
+const FAIL_STEPS = [
+  { key: 'INVENTORY_FAILED',     label: 'Inventory Failed',     desc: 'Insufficient stock' },
+  { key: 'PAYMENT_FAILED',       label: 'Payment Failed',       desc: 'Card declined or gateway error' },
+];
+
+function startTracking(orderId) {
+  if (activeStream) activeStream.close();
+
+  renderTracker(orderId, 'PENDING');
+  clearAuditLog();
+
+  const es = new EventSource(`/orders/${orderId}/stream`);
+  activeStream = es;
+
+  es.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+
+    if (msg.type === 'status') {
+      renderTracker(orderId, msg.status);
+      updateRecentOrder(orderId, msg.status);
+    }
+    if (msg.type === 'audit') {
+      appendAuditEntry(msg);
+    }
+    if (msg.type === 'done') {
+      es.close();
+      activeStream = null;
+    }
+    if (msg.type === 'error') {
+      showToast(msg.message, 'error');
+      es.close();
+    }
+  };
+  es.onerror = () => { es.close(); activeStream = null; };
+}
+
+function renderTracker(orderId, currentStatus) {
+  const el = document.getElementById('trackerContent');
+
+  const isFailure = FAIL_STEPS.some(s => s.key === currentStatus);
+  const displaySteps = isFailure
+    ? [STATUS_STEPS[0], FAIL_STEPS.find(s => s.key === currentStatus)]
+    : STATUS_STEPS;
+
+  const happyKeys = STATUS_STEPS.map(s => s.key);
+  const currentIdx = displaySteps.findIndex(s => s.key === currentStatus);
+
+  const stepsHtml = displaySteps.map((step, i) => {
+    let cls = '';
+    if (isFailure && i === displaySteps.length - 1) cls = 'failed';
+    else if (i < currentIdx) cls = 'done';
+    else if (i === currentIdx) cls = 'active';
+
+    const icon = cls === 'done' ? '✓' : cls === 'failed' ? '✕' : '';
+
+    return `
+    <div class="step ${cls}">
+      <div class="step-dot">${icon}</div>
+      <div class="step-info">
+        <div class="step-label">${step.label}</div>
+        <div class="step-desc">${step.desc}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="order-id-label">Order: ${orderId}</div>
+    <div class="steps">${stepsHtml}</div>`;
+}
+
+// ── Audit log ──────────────────────────────────────────────────────────────
+function clearAuditLog() {
+  document.getElementById('auditLog').innerHTML = '';
+  document.getElementById('auditBadge').style.display = 'none';
+  document.getElementById('auditBadge').textContent = '0';
+}
+
+function appendAuditEntry(ev) {
+  const log = document.getElementById('auditLog');
+  if (log.querySelector('.audit-empty')) log.innerHTML = '';
+
+  const time = ev.recordedAt ? new Date(ev.recordedAt).toLocaleTimeString() : new Date().toLocaleTimeString();
+  const typeClass = ev.eventType.startsWith('order') ? 'order' : ev.eventType.startsWith('inventory') ? 'inventory' : 'payment';
+
+  const entry = document.createElement('div');
+  entry.className = 'audit-entry';
+  entry.innerHTML = `<span class="audit-time">${time}</span><span class="audit-type ${typeClass}">${ev.eventType}</span>`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+
+  const badge = document.getElementById('auditBadge');
+  badge.style.display = 'inline';
+  badge.textContent = log.children.length;
+}
+
+// ── Recent orders ──────────────────────────────────────────────────────────
+function addRecentOrder(orderId, status) {
+  recentOrders.unshift({ orderId, status, ts: new Date() });
+  renderRecentOrders();
+}
+function updateRecentOrder(orderId, status) {
+  const o = recentOrders.find(x => x.orderId === orderId);
+  if (o) { o.status = status; renderRecentOrders(); }
+}
+function renderRecentOrders() {
+  const el = document.getElementById('recentOrders');
+  if (!recentOrders.length) { el.textContent = 'No orders yet.'; return; }
+
+  const STATUS_COLOR = {
+    PENDING: 'var(--muted)', INVENTORY_RESERVED: 'var(--accent)',
+    PAYMENT_PROCESSED: 'var(--warn)', COMPLETED: 'var(--success)',
+    PAYMENT_FAILED: 'var(--danger)', INVENTORY_FAILED: 'var(--danger)',
+  };
+  el.innerHTML = recentOrders.slice(0, 5).map(o => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+      <span style="font-family:monospace;font-size:0.8rem;cursor:pointer;color:var(--accent)" onclick="startTracking('${o.orderId}')">${o.orderId}</span>
+      <span style="color:${STATUS_COLOR[o.status]||'var(--muted)'};font-size:0.8rem;font-weight:600">${o.status}</span>
+    </div>`).join('');
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+let toastTimer;
+function showToast(msg, type = 'info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.classList.remove('show'); }, 3500);
+}
+
+function scrollToCart() {
+  document.getElementById('cartSection').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+loadProducts();
+</script>
+</body>
+</html>
